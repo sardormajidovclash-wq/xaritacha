@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Zal o'rindiqlari sxemasi</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --ink:#1a1a1a;
+    --muted:#6b7280;
+    --line:#2b2b2b;
+    --seat-empty:#ffffff;
+    --seat-empty-border:#3a3a3a;
+    --seat-occupied:#c9cdd3;
+    --seat-occupied-border:#8a8f98;
+    --accent:#1d6fd6;
+    --accent-bg:#eaf2fd;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:#ffffff;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;}
+  .wrap{max-width:1000px;margin:0 auto;padding:10px 10px 24px;}
+  h1{font-size:18px;text-align:center;margin:10px 0 4px;font-weight:700;}
+  .sub{text-align:center;color:var(--muted);font-size:12.5px;margin-bottom:10px;}
+
+  .infobar{
+    position:sticky; top:0; z-index:30;
+    background:#ffffff;
+    border:1px solid #e3e5e8;
+    border-radius:12px;
+    padding:10px 12px;
+    display:flex; align-items:center; justify-content:space-between;
+    gap:10px; margin-bottom:10px;
+    box-shadow:0 2px 10px rgba(0,0,0,0.06);
+  }
+  .infobar .label{font-size:12px; color:var(--muted); margin-bottom:2px;}
+  .infobar .value{font-size:16px; font-weight:700; color:var(--ink);}
+  .infobar .value.placeholder{color:var(--muted); font-weight:500; font-size:13px;}
+  .status-pill{
+    padding:4px 10px; border-radius:20px; font-size:12px; font-weight:600;
+    border:1px solid transparent;
+  }
+  .status-pill.empty{background:#f3f4f6; color:#374151; border-color:#d7d9dd;}
+  .status-pill.occupied{background:#e9eaec; color:#3f4550; border-color:#b9bcc2;}
+
+  .stage-container{
+    position:relative;
+    border:1px solid #e3e5e8;
+    border-radius:14px;
+    background:#ffffff;
+    overflow:hidden;
+    touch-action:none;
+    height:62vh;
+    min-height:420px;
+  }
+  .stage-container svg{
+    display:block;
+    background:#ffffff;
+  }
+  #panzoom{
+    transform-origin: 0 0;
+    will-change: transform;
+  }
+
+  .zoom-controls{
+    position:absolute; right:10px; bottom:10px; z-index:20;
+    display:flex; flex-direction:column; gap:6px;
+  }
+  .zoom-controls button{
+    width:40px;height:40px;border-radius:10px;border:1px solid #d7d9dd;
+    background:#ffffff; font-size:20px; font-weight:700; color:var(--ink);
+    box-shadow:0 2px 6px rgba(0,0,0,0.08);
+  }
+  .zoom-controls button:active{background:#f2f3f5;}
+  .hint{
+    position:absolute; left:10px; bottom:10px; z-index:20;
+    font-size:11px; color:var(--muted); background:#ffffffcc; padding:4px 8px;
+    border-radius:8px; border:1px solid #e3e5e8;
+  }
+
+  seat-legend, .legend{
+    display:flex; gap:16px; align-items:center; justify-content:center;
+    flex-wrap:wrap; margin-top:12px; font-size:13px;
+  }
+  .legend .item{display:flex; align-items:center; gap:6px;}
+  .swatch{width:18px;height:14px;border-radius:3px; display:inline-block;}
+  .swatch.empty{background:var(--seat-empty); border:1.5px solid var(--seat-empty-border);}
+  .swatch.occupied{background:var(--seat-occupied); border:1.5px solid var(--seat-occupied-border);}
+  .swatch.selected{background:var(--accent-bg); border:1.5px solid var(--accent);}
+
+  details.legend-table{
+    margin-top:16px; border:1px solid #e3e5e8; border-radius:12px; padding:10px 14px;
+  }
+  details.legend-table summary{cursor:pointer; font-weight:600; font-size:14px; padding:4px 0;}
+  table{width:100%; border-collapse:collapse; margin-top:8px; font-size:12.5px;}
+  table th, table td{border:1px solid #e6e7ea; padding:6px 8px; text-align:left;}
+  table th{background:#f7f8f9;}
+
+  .seat-rect{cursor:pointer;}
+  .seat-rect.empty{fill:var(--seat-empty); stroke:var(--seat-empty-border); stroke-width:1.6;}
+  .seat-rect.occupied{fill:var(--seat-occupied); stroke:var(--seat-occupied-border); stroke-width:1.6;}
+  .seat-rect.selected{fill:var(--accent-bg) !important; stroke:var(--accent) !important; stroke-width:2.4 !important;}
+  .col-label{font-size:15px; font-weight:700; fill:#111; text-anchor:middle;}
+  .zone-label{font-size:13px; font-weight:700; fill:#333; text-anchor:middle;}
+  .room-outline{fill:#ffffff; stroke:var(--line); stroke-width:3;}
+  .wall{stroke:var(--line); stroke-width:3; fill:none;}
+  .deco-label{font-size:11px; fill:#8a8f98; text-anchor:middle;}
+  .table-line{stroke:#b9bcc2; stroke-width:1; fill:none;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Zal o'rindiqlari — interaktiv sxema</h1>
+  <div class="sub">Joyni tanlash uchun bosing. Katta ko'rish uchun barmoqlaringiz bilan kattalashtiring yoki pastdagi + / − tugmalaridan foydalaning.</div>
+
+  <div class="infobar">
+    <div>
+      <div class="label">Tanlangan joy</div>
+      <div id="selValue" class="value placeholder">Hali joy tanlanmagan</div>
+    </div>
+    <div id="selStatus"></div>
+  </div>
+
+  <div class="stage-container" id="stageContainer">
+    <div id="panzoom">
+      <svg id="svgRoot" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+    <div class="zoom-controls">
+      <button id="zoomIn" aria-label="Kattalashtirish">+</button>
+      <button id="zoomOut" aria-label="Kichiklashtirish">−</button>
+      <button id="zoomReset" aria-label="Asl holat" style="font-size:14px;">⟳</button>
+    </div>
+    <div class="hint">Surish: bosib torting</div>
+  </div>
+
+  <div class="legend">
+    <div class="item"><span class="swatch empty"></span> Bo'sh joy</div>
+    <div class="item"><span class="swatch occupied"></span> Band joy</div>
+    <div class="item"><span class="swatch selected"></span> Tanlangan joy</div>
+  </div>
+
+  <details class="legend-table">
+    <summary>Xonalar ekspilikatsiyasi (jadval)</summary>
+    <table>
+      <thead><tr><th>№</th><th>Xona nomi</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Oshxona (190 o'rinli zal)</td></tr>
+        <tr><td>2</td><td>Issiq sex</td></tr>
+        <tr><td>3</td><td>Tayyorlov xonasi</td></tr>
+        <tr><td>4</td><td>Idish yuvish xonasi</td></tr>
+        <tr><td>5</td><td>Dahliz</td></tr>
+        <tr><td>6</td><td>Ombor</td></tr>
+        <tr><td>7</td><td>Yuklash xonasi</td></tr>
+        <tr><td>8</td><td>Tozalash anjomlari xonasi</td></tr>
+        <tr><td>9</td><td>Hojatxona</td></tr>
+        <tr><td>10</td><td>Idishlar (tara) xonasi</td></tr>
+        <tr><td>11</td><td>Xodimlar kiyinish xonasi</td></tr>
+        <tr><td>12</td><td>Kitob saqlash xonasi</td></tr>
+        <tr><td>13</td><td>Dahliz</td></tr>
+        <tr><td>14</td><td>Zinapoya L-1</td></tr>
+        <tr><td>15</td><td>Elektr shchit xonasi (UPS)</td></tr>
+        <tr><td>16</td><td>Holl</td></tr>
+        <tr><td>17</td><td>Hojatxona</td></tr>
+        <tr><td>18</td><td>Hojatxona</td></tr>
+        <tr><td>19</td><td>Nogironlar uchun hojatxona</td></tr>
+        <tr><td>20</td><td>Ventilyatsiya xonasi</td></tr>
+        <tr><td>22</td><td>Nasos stansiyasi</td></tr>
+        <tr><td>23</td><td>Zinapoya L-2</td></tr>
+      </tbody>
+    </table>
+  </details>
+</div>
+
+<script>
+(function(){
+  // ---------- DATA MODEL ----------
+  // 13 main rows (qator), counted from the original plan: front-block + 8 + 8 + back-block
+  const frontBack = [0,2,3,3,3,3,3,5,5,5,5,5,5]; // per qator, symmetric front/back extra seats
+  const MID = 8; // two fixed middle blocks of 8 seats each, present in every qator
+  const columns = frontBack.map(fb => ({front: fb, mid1: MID, mid2: MID, back: fb}));
+
+  const SEAT_W = 24, SEAT_H = 18, SEAT_GAP = 5;
+  const COL_GAP = 10;
+  const SLOT_H = SEAT_H + SEAT_GAP;
+  const SLOT_W = SEAT_W + COL_GAP;
+  const AISLE = 38; // gap between blocks within a column (walking aisle)
+  const MID_Y0 = 210; // fixed y where mid1 block begins (shared across all columns)
+  const LEFT_ZONE_W = 210; // width reserved on the left for the curved reception desk
+
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.getElementById('svgRoot');
+
+  function seatRect(x, y, row, seatNum, occupied){
+    const r = document.createElementNS(svgNS, 'rect');
+    r.setAttribute('x', x);
+    r.setAttribute('y', y);
+    r.setAttribute('width', SEAT_W);
+    r.setAttribute('height', SEAT_H);
+    r.setAttribute('rx', 4);
+    r.setAttribute('class', 'seat-rect ' + (occupied ? 'occupied' : 'empty'));
+    r.dataset.row = row;
+    r.dataset.seat = seatNum;
+    r.dataset.status = occupied ? 'occupied' : 'empty';
+    return r;
+  }
+
+  // deterministic pseudo-random occupancy for demo purposes
+  function seeded(i){
+    const v = Math.sin(i*12.9898)*43758.5453;
+    return v - Math.floor(v);
+  }
+
+  let seatCounter = 0;
+  let maxRight = 0, minTop = 1e9, maxBottom = 0;
+
+  columns.forEach((col, ci) => {
+    const qatorNo = ci + 1;
+    const x = ci * SLOT_W + 20 + LEFT_ZONE_W;
+    let seatIdx = 0;
+
+    // column label (top reference line, common for all columns)
+    const topLabelY = MID_Y0 - AISLE - 5*SLOT_H - AISLE - 26; // above tallest possible column
+    const label = document.createElementNS(svgNS,'text');
+    label.setAttribute('x', x + SEAT_W/2);
+    label.setAttribute('y', topLabelY);
+    label.setAttribute('class','col-label');
+    label.textContent = qatorNo;
+    svg.appendChild(label);
+
+    // FRONT block (above mid1)
+    const frontTotalH = col.front * SLOT_H;
+    let frontTop = MID_Y0 - AISLE - frontTotalH;
+    for(let i=0;i<col.front;i++){
+      seatIdx++; seatCounter++;
+      const y = frontTop + i*SLOT_H;
+      const occ = false;
+      svg.appendChild(seatRect(x, y, qatorNo, seatIdx, occ));
+      minTop = Math.min(minTop, y);
+    }
+
+    // MID1 block
+    for(let i=0;i<col.mid1;i++){
+      seatIdx++; seatCounter++;
+      const y = MID_Y0 + i*SLOT_H;
+      const occ = false;
+      svg.appendChild(seatRect(x, y, qatorNo, seatIdx, occ));
+      minTop = Math.min(minTop, y);
+    }
+
+    // MID2 block
+    const mid2Top = MID_Y0 + col.mid1*SLOT_H + AISLE;
+    for(let i=0;i<col.mid2;i++){
+      seatIdx++; seatCounter++;
+      const y = mid2Top + i*SLOT_H;
+      const occ = false;
+      svg.appendChild(seatRect(x, y, qatorNo, seatIdx, occ));
+    }
+
+    // BACK block
+    const backTop = mid2Top + col.mid2*SLOT_H + AISLE;
+    for(let i=0;i<col.back;i++){
+      seatIdx++; seatCounter++;
+      const y = backTop + i*SLOT_H;
+      const occ = false;
+      svg.appendChild(seatRect(x, y, qatorNo, seatIdx, occ));
+      maxBottom = Math.max(maxBottom, y + SEAT_H);
+    }
+
+    maxRight = Math.max(maxRight, x + SEAT_W);
+  });
+
+  const totalMainSeats = seatCounter;
+
+  // ---------- LEFT CURVED RECEPTION / WAITING DESK ZONE ----------
+  (function drawLeftZone(){
+    const topY = minTop, bottomY = maxBottom;
+    const centerY = (topY + bottomY) / 2;
+    const corridorX = 26;      // outer corridor wall
+    const wallNearX = 150;     // curved wall x at top/bottom (near)
+    const wallFarX = 200;      // curved wall x at middle (bulge, toward the hall)
+
+    // corridor wall (straight, thin hallway on the far left)
+    const corridor = document.createElementNS(svgNS,'line');
+    corridor.setAttribute('x1', corridorX); corridor.setAttribute('y1', topY);
+    corridor.setAttribute('x2', corridorX); corridor.setAttribute('y2', bottomY);
+    corridor.setAttribute('class','wall');
+    svg.appendChild(corridor);
+
+    // curved wall separating corridor from the waiting nook
+    const curve = document.createElementNS(svgNS,'path');
+    curve.setAttribute('d', `M ${wallNearX} ${topY} Q ${wallFarX} ${centerY} ${wallNearX} ${bottomY}`);
+    curve.setAttribute('class','wall');
+    svg.appendChild(curve);
+
+    // door swing marks (simple quarter-arc, decorative)
+    [topY + (bottomY-topY)*0.14, bottomY - (bottomY-topY)*0.14].forEach(dy=>{
+      const door = document.createElementNS(svgNS,'path');
+      door.setAttribute('d', `M ${corridorX+4} ${dy-26} A 30 30 0 0 1 ${corridorX+34} ${dy+4}`);
+      door.setAttribute('class','table-line');
+      svg.appendChild(door);
+    });
+
+    // zone label
+    const lbl = document.createElementNS(svgNS,'text');
+    lbl.setAttribute('x', (corridorX+wallNearX)/2 + 10);
+    lbl.setAttribute('y', topY - 20);
+    lbl.setAttribute('class','zone-label');
+    lbl.textContent = "Minbar";
+    svg.appendChild(lbl);
+
+    // curved reception desk (orange), between chairs and the curved wall
+    const deskNearX = 118, deskFarX = 140;
+    const deskTop = centerY - 3.3*SLOT_H, deskBottom = centerY + 3.3*SLOT_H;
+    const desk = document.createElementNS(svgNS,'path');
+    desk.setAttribute('d', `M ${deskNearX} ${deskTop} Q ${deskFarX+18} ${centerY} ${deskNearX} ${deskBottom} L ${deskNearX-16} ${deskBottom} Q ${deskFarX} ${centerY} ${deskNearX-16} ${deskTop} Z`);
+    desk.setAttribute('fill', '#f2b866');
+    desk.setAttribute('stroke', '#c8862f');
+    desk.setAttribute('stroke-width', '1.5');
+    svg.appendChild(desk);
+    // divider line across the middle of the desk (as seen in the plan)
+    const div = document.createElementNS(svgNS,'line');
+    div.setAttribute('x1', deskNearX-18); div.setAttribute('y1', centerY);
+    div.setAttribute('x2', deskNearX+2); div.setAttribute('y2', centerY);
+    div.setAttribute('class','table-line');
+    svg.appendChild(div);
+
+    // 6 chairs, vertical column, facing the desk
+    const chairX = 75;
+    const startY = centerY - 2.5*SLOT_H;
+    for(let i=0;i<6;i++){
+      seatCounter++;
+      const cy = startY + i*SLOT_H;
+      const occ = false;
+      const c = document.createElementNS(svgNS,'circle');
+      c.setAttribute('cx', chairX);
+      c.setAttribute('cy', cy);
+      c.setAttribute('r', SEAT_H/2 + 1);
+      c.setAttribute('class', 'seat-rect ' + (occ ? 'occupied' : 'empty'));
+      c.dataset.row = "Minbar";
+      c.dataset.seat = i+1;
+      c.dataset.status = occ ? 'occupied' : 'empty';
+      svg.appendChild(c);
+    }
+  })();
+
+  // ---------- PREZIDIUM (oval table) ZONE ----------
+  const pZoneX = maxRight + 90;
+  const pZoneTop = MID_Y0 - 40;
+  const ovalCx = pZoneX + 70, ovalCy = pZoneTop + 190, ovalRx = 55, ovalRy = 170;
+
+  const zoneLabel = document.createElementNS(svgNS,'text');
+  zoneLabel.setAttribute('x', ovalCx);
+  zoneLabel.setAttribute('y', pZoneTop - 20);
+  zoneLabel.setAttribute('class','zone-label');
+  zoneLabel.textContent = "Prezidium stoli";
+  svg.appendChild(zoneLabel);
+
+  const oval = document.createElementNS(svgNS,'ellipse');
+  oval.setAttribute('cx', ovalCx);
+  oval.setAttribute('cy', ovalCy);
+  oval.setAttribute('rx', ovalRx);
+  oval.setAttribute('ry', ovalRy);
+  oval.setAttribute('fill', '#f6efe8');
+  oval.setAttribute('stroke', '#c9a07a');
+  oval.setAttribute('stroke-width', '2');
+  svg.appendChild(oval);
+
+  // seats around oval: 1 top, 4 left, 4 right, 1 bottom = 10
+  const pSeats = [];
+  pSeats.push({x: ovalCx, y: ovalCy - ovalRy - 32});
+  for(let i=0;i<4;i++) pSeats.push({x: ovalCx - ovalRx - 34, y: ovalCy - 100 + i*66});
+  for(let i=0;i<4;i++) pSeats.push({x: ovalCx + ovalRx + 34, y: ovalCy - 100 + i*66});
+  pSeats.push({x: ovalCx, y: ovalCy + ovalRy + 32});
+
+  let pCounter = 0;
+  pSeats.forEach((p, idx)=>{
+    pCounter++;
+    const occ = false;
+    const r = seatRect(p.x - SEAT_W/2, p.y - SEAT_H/2, "Prezidium", pCounter, occ);
+    svg.appendChild(r);
+  });
+
+  maxBottom = Math.max(maxBottom, ovalCy + ovalRy + 60);
+  maxRight = Math.max(maxRight, pZoneX + 140);
+
+  // ---------- ROOM OUTLINE ----------
+  const pad = 40;
+  const outlineTop = minTop - 90;
+  const outlineLeft = 0;
+  const outlineWidth = maxRight + pad;
+  const outlineHeight = maxBottom - outlineTop + pad;
+
+  const outline = document.createElementNS(svgNS,'rect');
+  outline.setAttribute('x', outlineLeft);
+  outline.setAttribute('y', outlineTop);
+  outline.setAttribute('width', outlineWidth);
+  outline.setAttribute('height', outlineHeight);
+  outline.setAttribute('class','room-outline');
+  svg.insertBefore(outline, svg.firstChild);
+
+  const frontWallLabel = document.createElementNS(svgNS,'text');
+  frontWallLabel.setAttribute('x', outlineWidth/2);
+  frontWallLabel.setAttribute('y', outlineTop + 24);
+  frontWallLabel.setAttribute('class','deco-label');
+  frontWallLabel.textContent = "KIRISH / OLD TOMON";
+  svg.appendChild(frontWallLabel);
+
+  // set viewBox
+  svg.setAttribute('viewBox', `${outlineLeft} ${outlineTop} ${outlineWidth} ${outlineHeight}`);
+  svg.setAttribute('width', outlineWidth);
+  svg.setAttribute('height', outlineHeight);
+
+  // ---------- INTERACTIVITY: seat selection ----------
+  const selValue = document.getElementById('selValue');
+  const selStatus = document.getElementById('selStatus');
+  let selectedEl = null;
+
+  function renderStatus(el){
+    const status = el.dataset.status;
+    selStatus.innerHTML = '';
+    const pill = document.createElement('span');
+    pill.className = 'status-pill ' + status;
+    pill.textContent = status === 'occupied' ? 'Band' : "Bo'sh";
+    selStatus.appendChild(pill);
+  }
+
+  function selectSeat(t){
+    if(!t || !t.classList || !t.classList.contains('seat-rect')) return;
+    if(selectedEl) selectedEl.classList.remove('selected');
+    // toggle status
+    const newStatus = t.dataset.status === 'occupied' ? 'empty' : 'occupied';
+    t.dataset.status = newStatus;
+    t.classList.remove('empty','occupied');
+    t.classList.add(newStatus);
+    t.classList.add('selected');
+    selectedEl = t;
+    selValue.textContent = (typeof t.dataset.row === 'string' && isNaN(t.dataset.row))
+      ? `${t.dataset.row} — ${t.dataset.seat}-o'rin`
+      : `${t.dataset.row}-qator, ${t.dataset.seat}-o'rindiq`;
+    selValue.classList.remove('placeholder');
+    renderStatus(t);
+  }
+
+  function handleTapAt(clientX, clientY){
+    let el = document.elementFromPoint(clientX, clientY);
+    if(!el) return;
+    const t = el.closest ? el.closest('.seat-rect') : (el.classList && el.classList.contains('seat-rect') ? el : null);
+    if(t) selectSeat(t);
+  }
+
+  // ---------- PAN & ZOOM ----------
+  const container = document.getElementById('stageContainer');
+  const pz = document.getElementById('panzoom');
+  let scale = 1, tx = 0, ty = 0;
+  const MIN_SCALE = 0.4, MAX_SCALE = 5;
+
+  function applyTransform(){
+    pz.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+  }
+
+  function fitToContainer(){
+    const cw = container.clientWidth, ch = container.clientHeight;
+    const sw = outlineWidth, sh = outlineHeight;
+    scale = Math.min(cw/sw, ch/sh) * 0.95;
+    tx = (cw - sw*scale)/2;
+    ty = (ch - sh*scale)/2;
+    applyTransform();
+  }
+
+  function zoomAt(factor, cx, cy){
+    const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale*factor));
+    const ratio = newScale/scale;
+    tx = cx - (cx - tx)*ratio;
+    ty = cy - (cy - ty)*ratio;
+    scale = newScale;
+    applyTransform();
+  }
+
+  container.addEventListener('wheel', function(e){
+    e.preventDefault();
+    const rect = container.getBoundingClientRect();
+    const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+    zoomAt(e.deltaY < 0 ? 1.12 : 0.89, cx, cy);
+  }, {passive:false});
+
+  document.getElementById('zoomIn').addEventListener('click', ()=>{
+    zoomAt(1.25, container.clientWidth/2, container.clientHeight/2);
+  });
+  document.getElementById('zoomOut').addEventListener('click', ()=>{
+    zoomAt(0.8, container.clientWidth/2, container.clientHeight/2);
+  });
+  document.getElementById('zoomReset').addEventListener('click', fitToContainer);
+
+  // touch / pointer pan + pinch + tap-to-select (no native 'click' dependency,
+  // since pointer capture can prevent click from reaching the tapped seat)
+  let pointers = new Map();
+  let lastDist = null, dragging = false, dragStart = null;
+  let downInfo = null; // {x,y,id}
+  let capturedId = null;
+  const TAP_MOVE_THRESHOLD = 8;
+
+  container.addEventListener('pointerdown', (e)=>{
+    pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    if(pointers.size === 1){
+      dragging = false;
+      dragStart = {x:e.clientX - tx, y:e.clientY - ty};
+      downInfo = {x:e.clientX, y:e.clientY, id:e.pointerId};
+    } else if(pointers.size === 2){
+      dragging = false;
+      downInfo = null;
+      const pts = Array.from(pointers.values());
+      lastDist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+    }
+  });
+
+  container.addEventListener('pointermove', (e)=>{
+    if(!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    if(pointers.size === 1){
+      if(downInfo && downInfo.id === e.pointerId && !dragging){
+        const d = Math.hypot(e.clientX-downInfo.x, e.clientY-downInfo.y);
+        if(d > TAP_MOVE_THRESHOLD){
+          dragging = true;
+          if(capturedId === null){
+            try{ container.setPointerCapture(e.pointerId); capturedId = e.pointerId; }catch(err){}
+          }
+        }
+      }
+      if(dragging){
+        tx = e.clientX - dragStart.x;
+        ty = e.clientY - dragStart.y;
+        applyTransform();
+      }
+    } else if(pointers.size === 2){
+      const pts = Array.from(pointers.values());
+      const dist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+      const mid = {x:(pts[0].x+pts[1].x)/2, y:(pts[0].y+pts[1].y)/2};
+      const rect = container.getBoundingClientRect();
+      if(lastDist){
+        const factor = dist/lastDist;
+        zoomAt(factor, mid.x-rect.left, mid.y-rect.top);
+      }
+      lastDist = dist;
+    }
+  });
+
+  function endPointer(e){
+    if(pointers.size === 1 && downInfo && downInfo.id === e.pointerId && !dragging){
+      handleTapAt(e.clientX, e.clientY);
+    }
+    pointers.delete(e.pointerId);
+    if(pointers.size < 2){ lastDist = null; }
+    if(pointers.size === 0){
+      dragging = false; downInfo = null;
+      if(capturedId !== null){
+        try{ container.releasePointerCapture(capturedId); }catch(err){}
+        capturedId = null;
+      }
+    }
+  }
+  container.addEventListener('pointerup', endPointer);
+  container.addEventListener('pointercancel', endPointer);
+  container.addEventListener('pointerleave', endPointer);
+
+  window.addEventListener('resize', fitToContainer);
+  window.addEventListener('load', fitToContainer);
+  setTimeout(fitToContainer, 50);
+
+})();
+</script>
+</body>
+</html>
